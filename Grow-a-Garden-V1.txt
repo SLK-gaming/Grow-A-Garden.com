@@ -33,7 +33,6 @@ local Tabs = {
 
 --------------- All code ----------------
 
-setclipboard("https://discord.gg/dmBzVaRrD3")
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1065,72 +1064,8 @@ QuestToggle:OnChanged(function(state)
     end
 end)
 
--- Toggle Travelling Merchant Shop
-local TravelMerToggle = Tabs.Misc:AddToggle("TravelMerToggle", {
-    Title = "Travelling Merchant",
-    Default = false
-})
-
-TravelMerToggle:OnChanged(function(state)
-    local merchant = lp.PlayerGui:FindFirstChild("TravellingMerchant_Shop")
-    if merchant then
-        merchant.Enabled = state
-    end
-end)
 
 
--- Giả sử bạn đã có `Tabs.Misc` là nơi muốn đặt input
-Tabs.Misc:AddInput("FakeMoneyInput", {
-    Title = "Fake Money",
-    Default = "",
-    Placeholder = "Nhập số tiền cần fake...",
-    Numeric = true,
-    Finished = true, -- Chạy callback sau khi người dùng bấm Enter hoặc thoát focus
-    Callback = function(value)
-        local amount = tonumber(value)
-        if not amount then return end
-
-        -- Set leaderstats Sheckles (hiển thị client)
-        if lp and lp:FindFirstChild("leaderstats") and lp.leaderstats:FindFirstChild("Sheckles") then
-            lp.leaderstats.Sheckles.Value = amount
-        end
-
-        -- Format hiển thị tiền
-        local function formatCommas(n)
-            local negative = n < 0
-            n = tostring(math.abs(n))
-            local left, num, right = string.match(n, "^([^%d]*%d)(%d*)(.-)$")
-            local formatted = left .. (num:reverse():gsub("(%d%d%d)", "%1,"):reverse()) .. right
-            return (negative and "-" or "") .. formatted .. "¢"
-        end
-
-        local function shortenNumber(n)
-            local scales = {
-                {1e18, "Qi"}, {1e15, "Qa"}, {1e12, "T"},
-                {1e9, "B"}, {1e6, "M"}, {1e3, "K"}
-            }
-            local negative = n < 0
-            n = math.abs(n)
-            for _, scale in ipairs(scales) do
-                if n >= scale[1] then
-                    return (negative and "-" or "") .. string.format("%.2f%s", n / scale[1], scale[2])
-                end
-            end
-            return tostring(n)
-        end
-
-        -- Hiển thị UI
-        local shecklesUI = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("Sheckles_UI")
-        if shecklesUI and shecklesUI:FindFirstChild("TextLabel") then
-            shecklesUI.TextLabel.Text = formatCommas(amount)
-        end
-
-        local dealerBoard = workspace:FindFirstChild("DealerBoard")
-        if dealerBoard and dealerBoard:FindFirstChild("BillboardGui") and dealerBoard.BillboardGui:FindFirstChild("TextLabel") then
-            dealerBoard.BillboardGui.TextLabel.Text = shortenNumber(amount)
-        end
-    end
-})
 
 
 
@@ -1233,14 +1168,14 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local ExistingUI = CoreGui:FindFirstChild("HutaoHubMinimizeUI")
+local ExistingUI = CoreGui:FindFirstChild("SkullHubMinimizeUI")
 if ExistingUI then
     ExistingUI:Destroy()
 end
 
 -- Create Floating UI
 local DragUI = Instance.new("ScreenGui")
-DragUI.Name = "HutaoHubMinimizeUI"
+DragUI.Name = "SkullHubMinimizeUI"
 DragUI.ResetOnSpawn = false
 DragUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- Ensures highest rendering priority
 DragUI.Parent = CoreGui -- Overrides all other UI elements
