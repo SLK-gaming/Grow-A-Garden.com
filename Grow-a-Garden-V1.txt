@@ -173,80 +173,6 @@ end)
 
 
 
-local autoCollectEnabled = false
-local fastClickThread
-local CLICK_DELAY = 0.00000001
-local MAX_DISTANCE = 50
-
-local function isValidPrompt(prompt)
-    local parent = prompt.Parent
-    if not parent then return false end
-    local name = parent.Name:lower()
-    return not (name:find("sign") or name:find("core"))
-end
-
-local function getNearbyPrompts()
-    local nearby = {}
-    local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nearby end
-
-    for _, farm in pairs(workspace.Farm:GetChildren()) do
-        local data = farm:FindFirstChild("Important") and farm.Important:FindFirstChild("Data")
-        if data and data:FindFirstChild("Owner") and data.Owner.Value == lp.Name then
-            for _, obj in pairs(farm:GetDescendants()) do
-                if obj:IsA("ProximityPrompt") and isValidPrompt(obj) then
-                    local part = obj.Parent
-                    if part:IsA("BasePart") then
-                        local dist = (hrp.Position - part.Position).Magnitude
-                        if dist <= MAX_DISTANCE then
-                            table.insert(nearby, obj)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    return nearby
-end
-
-local function fastClickFarm()
-    if fastClickThread then task.cancel(fastClickThread) end
-    fastClickThread = task.spawn(function()
-        while autoCollectEnabled do
-            if isInventoryFull() then
-                task.wait(1)
-            else
-                local prompts = getNearbyPrompts()
-                for _, prompt in pairs(prompts) do
-                    if not autoCollectEnabled then return end
-                    if isInventoryFull() then break end
-                    fireproximityprompt(prompt, 1)
-                    task.wait(CLICK_DELAY)
-                end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
--- Tạo nút Fluent UI toggle
-local autoCollectToggle = Tabs.Farm:AddToggle("AutoCollectToggle", {
-    Title = "Auto Collect",
-    Default = false,
-})
-
-autoCollectToggle:OnChanged(function(value)
-    autoCollectEnabled = value
-    if autoCollectEnabled then
-        fastClickFarm()
-    else
-        if fastClickThread then
-            task.cancel(fastClickThread)
-            fastClickThread = nil
-        end
-    end
-end)
-
 
 
 
@@ -516,30 +442,6 @@ end)
 
 
 
-local SellAllToggle = Tabs.Farm:AddToggle("SellAllToggle", {
-    Title = "Sell All",
-    Default = false
-})
-
-local sellAllEnabled = false
-local sellAllThread = nil
-
-SellAllToggle:OnChanged(function(state)
-    sellAllEnabled = state
-    if sellAllEnabled then
-        sellAllThread = task.spawn(function()
-            while sellAllEnabled do
-                SellAll()
-                task.wait(1) -- chỉnh thời gian delay nếu cần
-            end
-        end)
-    else
-        if sellAllThread then
-            task.cancel(sellAllThread)
-            sellAllThread = nil
-        end
-    end
-end)
 
 
 
@@ -632,50 +534,6 @@ local AutoHarvestToggle = Tabs.Farm:AddToggle("AutoHarvestToggle", {
 AutoHarvestToggle:OnChanged(function(state)
     ToggleHarvest(state)
 end)
-
-
-
-
-
-
-
-local DupeCrimsonToggle = Tabs.Farm:AddToggle("DupeCrimsonToggle", {
-    Title = "Dupe Crimson Vine",
-    Default = false
-})
-
-DupeCrimsonToggle:OnChanged(function(state)
-    CRimsonDupeE = state
-    if CRimsonDupeE then
-        DupeCrimson()
-    elseif CrimsonDupe then
-        task.cancel(CrimsonDupe)
-        CrimsonDupe = nil
-    end
-end)
-
-
-
-
-
-
-
-
-local DupeBananaToggle = Tabs.Farm:AddToggle("DupeBananaToggle", {
-    Title = "Dupe Banana",
-    Default = false
-})
-
-DupeBananaToggle:OnChanged(function(state)
-    BAnanaDupeE = state
-    if BAnanaDupeE then
-        DupeBanana()
-    elseif BananaDupe then
-        task.cancel(BananaDupe)
-        BananaDupe = nil
-    end
-end)
-
 
 
 
@@ -970,14 +828,7 @@ end)
 
 
 
-local AutoGiveMoonToggle = Tabs.Items:AddToggle("AutoGiveMoonToggle", {
-    Title = "Auto Give Fruit Moon",
-    Default = false
-})
 
-AutoGiveMoonToggle:OnChanged(function(state)
-    AutoGiveFruitMoon(state)
-end)
 
 -- Tabs.Player
 
@@ -1228,14 +1079,58 @@ TravelMerToggle:OnChanged(function(state)
 end)
 
 
+-- Giả sử bạn đã có `Tabs.Misc` là nơi muốn đặt input
+Tabs.Misc:AddInput("FakeMoneyInput", {
+    Title = "Fake Money",
+    Default = "",
+    Placeholder = "Nhập số tiền cần fake...",
+    Numeric = true,
+    Finished = true, -- Chạy callback sau khi người dùng bấm Enter hoặc thoát focus
+    Callback = function(value)
+        local amount = tonumber(value)
+        if not amount then return end
 
-local OpenBloodShopButton = Tabs.Misc:AddButton("OpenBloodShopButton", {
-    Title = "Open Blood Shop"
+        -- Set leaderstats Sheckles (hiển thị client)
+        if lp and lp:FindFirstChild("leaderstats") and lp.leaderstats:FindFirstChild("Sheckles") then
+            lp.leaderstats.Sheckles.Value = amount
+        end
+
+        -- Format hiển thị tiền
+        local function formatCommas(n)
+            local negative = n < 0
+            n = tostring(math.abs(n))
+            local left, num, right = string.match(n, "^([^%d]*%d)(%d*)(.-)$")
+            local formatted = left .. (num:reverse():gsub("(%d%d%d)", "%1,"):reverse()) .. right
+            return (negative and "-" or "") .. formatted .. "¢"
+        end
+
+        local function shortenNumber(n)
+            local scales = {
+                {1e18, "Qi"}, {1e15, "Qa"}, {1e12, "T"},
+                {1e9, "B"}, {1e6, "M"}, {1e3, "K"}
+            }
+            local negative = n < 0
+            n = math.abs(n)
+            for _, scale in ipairs(scales) do
+                if n >= scale[1] then
+                    return (negative and "-" or "") .. string.format("%.2f%s", n / scale[1], scale[2])
+                end
+            end
+            return tostring(n)
+        end
+
+        -- Hiển thị UI
+        local shecklesUI = lp:FindFirstChild("PlayerGui") and lp.PlayerGui:FindFirstChild("Sheckles_UI")
+        if shecklesUI and shecklesUI:FindFirstChild("TextLabel") then
+            shecklesUI.TextLabel.Text = formatCommas(amount)
+        end
+
+        local dealerBoard = workspace:FindFirstChild("DealerBoard")
+        if dealerBoard and dealerBoard:FindFirstChild("BillboardGui") and dealerBoard.BillboardGui:FindFirstChild("TextLabel") then
+            dealerBoard.BillboardGui.TextLabel.Text = shortenNumber(amount)
+        end
+    end
 })
-
-OpenBloodShopButton:OnClick(function()
-    OpenBloodShop()
-end)
 
 
 
