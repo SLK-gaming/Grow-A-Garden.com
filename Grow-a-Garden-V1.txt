@@ -1074,89 +1074,114 @@ end)
 
 
 
-
--- 🟢 Auto-enable Anti-AFK on GUI load
-AntiAfk(true) -- Gọi ngay khi script chạy
-
--- 🔘 Toggle Button for Anti-AFK
-local AntiAfkToggle = Tabs.Settings:AddToggle("AntiAfkToggle", {
-    Title = "Anti AFK",
-    Default = true -- Mặc định bật
-})
-
-AntiAfkToggle:OnChanged(function(state)
-    AntiAfk(state)
-end)
-
-
-
-
-
--- Khai báo biến và sự kiện
-local favoriteEvent = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Favorite_Item")
-local autoFavoriteEnabled = true -- mặc định bật
-local favoriteConnection = nil
-local selectedMutations = { "Golden", "Huge", "Mutated" }
-
--- Hàm kiểm tra và gắn dấu yêu thích
-local function toolMatchesMutation(toolName)
-    for _, mutation in ipairs(selectedMutations) do
-        if string.find(toolName, mutation) then
-            return true
+    local FpsbfToggle1 = Tabs.Settings:AddToggle("FpsbfToggle1", {Title = "FPS Boost", Default = false })
+    FpsbfToggle1:OnChanged(function(Value)
+        if Value then
+            for _, v in pairs(game:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.Material = Enum.Material.SmoothPlastic
+                    v.Reflectance = 0
+                end
+            end
         end
-    end
-    return false
-end
-
-local function isToolFavorited(tool)
-    return tool:GetAttribute("Favorite") or (tool:FindFirstChild("Favorite") and tool.Favorite.Value)
-end
-
-local function favoriteToolIfMatches(tool)
-    if toolMatchesMutation(tool.Name) and not isToolFavorited(tool) then
-        favoriteEvent:FireServer(tool)
-        task.wait(0.1)
-    end
-end
-
-local function processBackpack()
-    local backpack = lp:FindFirstChild("Backpack") or lp:WaitForChild("Backpack")
-    for _, tool in ipairs(backpack:GetChildren()) do
-        favoriteToolIfMatches(tool)
-    end
-end
-
-local function setupAutoFavorite()
-    if favoriteConnection then favoriteConnection:Disconnect() end
-
-    local backpack = lp:WaitForChild("Backpack")
-    favoriteConnection = backpack.ChildAdded:Connect(function(tool)
-        task.wait(0.1)
-        favoriteToolIfMatches(tool)
     end)
 
-    processBackpack()
+    getgenv().antiAfkEnabled = true
+    local afkConnection
+
+    local AntiAfkToggle = Tabs.Settings:AddToggle("AntiAfkToggle", {
+        Title = "Anti AFK",
+        Default = true
+    })
+
+    local function startAntiAfk()
+        local player = game:GetService("Players").LocalPlayer
+        local virtualUser = game:GetService("VirtualUser")
+        if afkConnection then afkConnection:Disconnect() end
+        afkConnection = player.Idled:Connect(function()
+            if getgenv().antiAfkEnabled then
+                virtualUser:CaptureController()
+                virtualUser:ClickButton2(Vector2.new()) -- Simulates user activity
+            end
+        end)
+    end
+
+    AntiAfkToggle:OnChanged(function(Value)
+        getgenv().antiAfkEnabled = Value
+        if Value then
+            Fluent:Notify({
+                Title = "Hutao HUB",
+                Content = "Anti AFK is enabled!",
+                Duration = 5
+            })
+            startAntiAfk()
+        else
+            Fluent:Notify({
+                Title = "Hutao HUB",
+                Content = "Anti AFK is disabled!",
+                Duration = 5
+            })
+            if afkConnection then
+                afkConnection:Disconnect()
+                afkConnection = nil
+            end
+        end
+    end)
+
 end
 
--- Gọi tự động khi load
-setupAutoFavorite()
-
--- ✅ Nút Toggle để bật/tắt Auto Favorite
-local AutoFavoriteToggle = Tabs.Settings:AddToggle("AutoFavoriteToggle", {
-    Title = "Auto Favorite",
-    Default = true -- mặc định bật
-})
-
-AutoFavoriteToggle:OnChanged(function(state)
-    autoFavoriteEnabled = state
-
-    if autoFavoriteEnabled then
-        setupAutoFavorite()
-    elseif favoriteConnection then
-        favoriteConnection:Disconnect()
-        favoriteConnection = nil
+local AexecToggle = Tabs.Settings:AddToggle("AexecToggle", {Title = "Auto Execute", Default = false })
+AexecToggle:OnChanged(function(Value)
+    if Value then
+        task.spawn(function()
+            pcall(function()
+                if queue_on_teleport then
+                    local HutaoHubScript1 = [[
+task.wait(3)
+loadstring(game:HttpGet('https://raw.githubusercontent.com/hungquan99/SkullHub/main/loader.lua'))()
+]]
+                    queue_on_teleport(HutaoHubScript1)
+                end
+            end)
+        end)
+        Fluent:Notify({
+            Title = "Hutao HUB",
+            Content = "Auto execute is enabled!",
+            Duration = 5
+        })
+    else
+        Fluent:Notify({
+            Title = "Hutao HUB",
+            Content = "Auto execute is disabled!",
+            Duration = 5
+        })
     end
 end)
+
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+
+-- Ignore keys that are used by ThemeManager.
+-- (we dont want configs to save themes, do we?)
+SaveManager:IgnoreThemeSettings()
+
+-- You can add indexes of elements the save manager should ignore
+SaveManager:SetIgnoreIndexes({})
+
+-- use case for doing it this way:
+-- a script hub could have themes in a global folder
+-- and game configs in a separate folder per game
+InterfaceManager:SetFolder("Hutao HUB")
+SaveManager:SetFolder("Hutao HUB/Dead Rails")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+-- Select First Tab By Default
+Window:SelectTab(1)
+
+Fluent:Notify({ Title = "Hutao HUB", Content = "Dead Rails script loaded successfully!", Duration = 5 })
+SaveManager:LoadAutoloadConfig()
 
 
 
@@ -1168,14 +1193,14 @@ local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local ExistingUI = CoreGui:FindFirstChild("SkullHubMinimizeUI")
+local ExistingUI = CoreGui:FindFirstChild("HutaoHubMinimizeUI")
 if ExistingUI then
     ExistingUI:Destroy()
 end
 
 -- Create Floating UI
 local DragUI = Instance.new("ScreenGui")
-DragUI.Name = "SkullHubMinimizeUI"
+DragUI.Name = "HutaoHubMinimizeUI"
 DragUI.ResetOnSpawn = false
 DragUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- Ensures highest rendering priority
 DragUI.Parent = CoreGui -- Overrides all other UI elements
