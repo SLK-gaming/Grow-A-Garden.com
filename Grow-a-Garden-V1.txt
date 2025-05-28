@@ -172,6 +172,31 @@ end)
 
 
 
+local autoBuySeeds = false
+local autoBuyGears = false
+local autoBuyEventItems = false
+
+-- Mua hạt giống
+Tabs.Farm:AddToggle("AutoBuySeeds", {
+    Title = "Auto Buy Seed",
+    Default = false,
+    Callback = function(Value)
+        autoBuySeeds = Value
+        task.spawn(function()
+            while autoBuySeeds do
+                for _, name in ipairs({
+                    "Carrot","Strawberry","Blueberry","Orange Tulip","Tomato",
+                    "Corn","Daffodil","Watermelon","Pumpkin","Apple","Bamboo",
+                    "Coconut","Cactus","Dragon Fruit","Mango","Grape","Mushroom",
+                    "Pepper","Cacao","Beanstalk"
+                }) do
+                    ReplicatedStorage.GameEvents.BuySeedStock:FireServer(name)
+                end
+                task.wait(2)
+            end
+        end)
+    end
+})
 
 
 
@@ -251,142 +276,6 @@ end)
 
 
 
-
-
-
--- Giả sử bạn đã có biến Tabs và lp (LocalPlayer)
-
-local AutoPlantToggle = Tabs.Farm:AddToggle("AutoPlantToggle", {
-    Title = "Auto Plant",
-    Default = false
-})
-
-local DestroyOthersToggle = Tabs.Farm:AddToggle("DestroyOthersToggle", {
-    Title = "Destroy Others Farm",
-    Default = false
-})
-
-local AutoPlanting = false
-local CurrentlyPlanting = false
-local SelectedSeeds = {"Seed1", "Seed2"} -- Thay bằng hạt giống bạn muốn auto trồng
-
--- Hàm lấy vị trí người chơi (giữ nguyên)
-local function getPlayerPosition()
-    local char = lp.Character or lp.CharacterAdded:Wait()
-    local root = char:FindFirstChild("HumanoidRootPart")
-    return root and root.Position or Vector3.zero
-end
-
-local plantRemote = ReplicatedStorage:WaitForChild("GameEvents"):WaitForChild("Plant_RE")
-
-local function plantEquippedSeed(seedName)
-    local pos = getPlayerPosition()
-    plantRemote:FireServer(pos, seedName)
-end
-
-local function equipTool(tool)
-    if not tool or not tool:IsDescendantOf(lp.Backpack) then return end
-    
-    pcall(function()
-        lp.Character.Humanoid:UnequipTools()
-        task.wait(0.1)
-        tool.Parent = lp.Character
-        while not lp.Character:FindFirstChild(tool.Name) do
-            task.wait(0.1)
-        end
-    end)
-end
-
-local function getCurrentSeedsInBackpack()
-    local result = {}
-    for _, tool in ipairs(lp.Backpack:GetChildren()) do
-        if tool:IsA("Tool") then
-            local base = tool.Name:match("^(.-) Seed")
-            if base and table.find(SelectedSeeds, base) then
-                result[#result + 1] = {BaseName = base, Tool = tool}
-            end
-        end
-    end
-    return result
-end
-
-local function startAutoPlanting()
-    if CurrentlyPlanting then return end
-    CurrentlyPlanting = true
-    
-    task.spawn(function()
-        while AutoPlanting do
-            local seeds = getCurrentSeedsInBackpack()
-            for _, data in ipairs(seeds) do
-                local tool = data.Tool
-                local seedName = data.BaseName
-                
-                if not table.find(SelectedSeeds, seedName) then continue end
-                
-                if tool and tool:IsA("Tool") and tool:IsDescendantOf(lp.Backpack) then
-                    equipTool(tool)
-                    task.wait(0.5)
-                    
-                    while AutoPlanting and lp.Character:FindFirstChild(tool.Name) do
-                        if not table.find(SelectedSeeds, seedName) then break end
-                        plantEquippedSeed(seedName)
-                        task.wait(0.2)
-                    end
-                end
-            end
-            task.wait(0.5)
-        end
-        CurrentlyPlanting = false
-    end)
-end
-
-AutoPlantToggle:OnChanged(function(state)
-    AutoPlanting = state
-    if AutoPlanting then
-        startAutoPlanting()
-    end
-end)
-
-local function DestroyOthersFarm()
-    local farms = workspace:FindFirstChild("Farm")
-    if not farms then return end
-    
-    for _, farm in pairs(farms:GetChildren()) do
-        local data = farm:FindFirstChild("Important") and farm.Important:FindFirstChild("Data")
-        if data and data:FindFirstChild("Owner") and data.Owner.Value ~= lp.Name then
-            local plants = farm:FindFirstChild("Important") and farm.Important:FindFirstChild("Plants_Physical")
-            if plants then
-                for _, obj in pairs(plants:GetChildren()) do
-                    obj:Destroy()
-                end
-            end
-        end
-    end
-end
-
-local destroyLoop
-
-DestroyOthersToggle:OnChanged(function(state)
-    if destroyLoop then
-        task.cancel(destroyLoop)
-        destroyLoop = nil
-    end
-    
-    if state then
-        destroyLoop = task.spawn(function()
-            while true do
-                DestroyOthersFarm()
-                task.wait(5) -- 5 giây kiểm tra và xóa 1 lần, chỉnh tùy ý
-            end
-        end)
-    end
-end)
-
-
-
-
-
-
 local autoSellEnabled = false
 local autoSellThread
 
@@ -417,7 +306,7 @@ end
 
 -- Tạo nút Auto Sell
 local AutoSellToggle = Tabs.Farm:AddToggle("AutoSellToggle", {
-    Title = "Auto Sell",
+    Title = "Auto Sell All",
     Default = false
 })
 
@@ -537,96 +426,8 @@ end)
 
 
 
--- Tabs.Items 
+-- Tabs.Items
 
-local autoSkipEnabled = false
-local autoSkipThread
-
-local AutoSkipToggle = Tabs.Items:AddToggle("AutoSkipToggle", {
-    Title = "Auto Open Crate",
-    Default = false
-})
-
-local function autoOpenCrate()
-    local character = lp.Character
-    local backpack = lp:FindFirstChild("Backpack")
-    local seedTool
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") and tool.Name:find("Basic Seed Pack") then
-                seedTool = tool
-                break
-            end
-        end
-    end
-    if seedTool and character then
-        seedTool.Parent = character
-    end
-
-    while autoSkipEnabled do
-        local PlayerGui = lp:FindFirstChild("PlayerGui")
-        local RollCrate_UI = PlayerGui and PlayerGui:FindFirstChild("RollCrate_UI")
-        local character = lp.Character
-        local equippedTool = character and character:FindFirstChildOfClass("Tool")
-        local holdingSeed = equippedTool and equippedTool.Name:find("Basic Seed Pack")
-
-        if RollCrate_UI then
-            if RollCrate_UI.Enabled then
-                local Frame = RollCrate_UI:FindFirstChild("Frame")
-                local Button = Frame and Frame:FindFirstChild("Skip")
-                if Button and Button:IsA("ImageButton") and Button.Visible then
-                    GuiService.SelectedObject = Button
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-                end
-            elseif holdingSeed then
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 1)
-                VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 1)
-            end
-        end
-        task.wait(0.1)
-    end
-end
-
-AutoSkipToggle:OnChanged(function(state)
-    autoSkipEnabled = state
-
-    if autoSkipEnabled then
-        autoSkipThread = task.spawn(autoOpenCrate)
-    elseif autoSkipThread then
-        task.cancel(autoSkipThread)
-        autoSkipThread = nil
-    end
-end)
-
-
-
-
-local autoBuySeeds = false
-local autoBuyGears = false
-local autoBuyEventItems = false
-
--- Mua hạt giống
-Tabs.Items:AddToggle("AutoBuySeeds", {
-    Title = "Auto Buy Seed Items",
-    Default = false,
-    Callback = function(Value)
-        autoBuySeeds = Value
-        task.spawn(function()
-            while autoBuySeeds do
-                for _, name in ipairs({
-                    "Carrot","Strawberry","Blueberry","Orange Tulip","Tomato",
-                    "Corn","Daffodil","Watermelon","Pumpkin","Apple","Bamboo",
-                    "Coconut","Cactus","Dragon Fruit","Mango","Grape","Mushroom",
-                    "Pepper","Cacao","Beanstalk"
-                }) do
-                    ReplicatedStorage.GameEvents.BuySeedStock:FireServer(name)
-                end
-                task.wait(2)
-            end
-        end)
-    end
-})
 
 
 
@@ -937,7 +738,7 @@ end
 
 -- 🟦 Add to Fluent GUI
 Tabs.Player:AddToggle("FlyToggle", {
-    Title = "Fly [PC]",
+    Title = "Fly [Mobie+PC]",
     Default = false,
     Callback = function(state)
         Fly(state)
