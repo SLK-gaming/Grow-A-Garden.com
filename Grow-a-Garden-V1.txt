@@ -200,6 +200,98 @@ Tabs.Farm:AddToggle("AutoBuySeeds", {
 
 
 
+    Tabs.Farm:AddSection("↳ Aura")
+
+
+-- Toggle: Pickup Aura
+local PickupAuraToggle = Tabs.Farm:AddToggle("PickupAuraToggle", {
+    Title = "Pickup Aura",
+    Default = false
+})
+
+-- Slider: Delay
+local PickupAuraDelaySlider = Tabs.Farm:AddSlider("PickupAuraDelay", {
+    Title = "Pickup Aura Delay",
+    Description = "Time between pickups (in seconds)",
+    Default = 0.5,
+    Min = 0.1,
+    Max = 60,
+    Rounding = 1
+})
+
+-- Slider: Range
+local PickupAuraRangeSlider = Tabs.Farm:AddSlider("PickupAuraRange", {
+    Title = "Pickup Aura Range",
+    Description = "How far to check for plants",
+    Default = 10,
+    Min = 5,
+    Max = 20,
+    Rounding = 0
+})
+
+-- Input: Min Weight
+local PickupMinWeightInput = Tabs.Farm:AddInput("PickupMinWeight", {
+    Title = "Pickup At Min Weight",
+    Default = "0.1",
+    Placeholder = "Min weight",
+    Numeric = true
+})
+
+-- Logic Variables
+local pickup_aura_enabled = false
+local pickup_thread = nil
+
+-- Toggle logic
+PickupAuraToggle:OnChanged(function(state)
+    pickup_aura_enabled = state
+
+    if pickup_aura_enabled then
+        -- Lấy giá trị từ các control Fluent
+        local delay = PickupAuraDelaySlider.Value
+        local range = PickupAuraRangeSlider.Value
+        local min_weight = tonumber(PickupMinWeightInput.Value) or 0.1
+
+        if min_weight < 0.01 then
+            Fluent:Notify({
+                Title = "Error",
+                Content = "Min Weight Must Be Above 0.01",
+                Duration = 3
+            })
+            PickupAuraToggle:Set(false)
+            return
+        end
+
+        pickup_thread = task.spawn(function()
+            while pickup_aura_enabled do
+                for _, v in next, farm:FindFirstChild("Plants_Physical"):GetChildren() do
+                    if v:IsA("Model") and local_player.Character:FindFirstChild("HumanoidRootPart") then
+                        for _, v2 in next, v:GetDescendants() do
+                            if v2:IsA("ProximityPrompt") and v2.Parent.Parent:FindFirstChild("Weight") then
+                                local weight = v2.Parent.Parent.Weight.Value
+                                local distance = (v:GetPivot().Position - local_player.Character:GetPivot().Position).Magnitude
+                                if weight > min_weight and distance < range then
+                                    fireproximityprompt(v2)
+                                    task.wait(delay)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait()
+            end
+        end)
+    elseif pickup_thread then
+        task.cancel(pickup_thread)
+        pickup_thread = nil
+    end
+end)
+
+
+
+
+
+
+
 local AutoCollectToggle = Tabs.Farm:AddToggle("AutoCollectV2Toggle", {
     Title = "Auto Collect V2",
     Default = false
