@@ -288,6 +288,104 @@ end)
 
 
 
+    Tabs.Farm:AddSection("↳ Plant")
+
+-- Biến trạng thái mặc định
+local auto_plant = false
+local auto_plant_method = "Choosen Position"
+local plant_delay = 1
+local plant_position = nil
+local auto_plant_thread = nil
+
+-- Tạo Toggle: Auto Plant
+local AutoPlantToggle = Tabs.Farm:AddToggle("AutoPlantToggle", {
+    Title = "Auto Plant",
+    Default = false,
+    Description = "Auto plants held seed"
+})
+
+-- Dropdown: Chọn phương pháp
+local AutoPlantMethodDropdown = Tabs.Farm:AddDropdown("AutoPlantMethodDropdown", {
+    Title = "Auto Plant Method",
+    Values = { "Choosen Position", "Player Position" },
+    Default = "Choosen Position",
+    Multi = false,
+    Description = "Auto plants with selected method"
+})
+
+-- Slider: Delay
+local PlantDelaySlider = Tabs.Farm:AddSlider("PlantDelaySlider", {
+    Title = "Auto Plant Delay",
+    Description = "Delay between each plant (seconds)",
+    Default = 1,
+    Min = 0,
+    Max = 10,
+    Rounding = 1
+})
+
+-- Button: Lấy vị trí
+local GetChosenPositionButton = Tabs.Farm:AddButton({
+    Title = "Get Chosen Position",
+    Description = "Save your current position for planting",
+    Callback = function()
+        if local_player.Character then
+            plant_position = local_player.Character:GetPivot().Position
+            Fluent:Notify({
+                Title = "Position Saved",
+                Content = tostring(plant_position),
+                Duration = 3
+            })
+        end
+    end
+})
+
+-- Bắt sự kiện khi thay đổi Dropdown
+AutoPlantMethodDropdown:OnChanged(function(value)
+    auto_plant_method = value
+end)
+
+-- Bắt sự kiện khi thay đổi Slider delay
+PlantDelaySlider:OnChanged(function(value)
+    plant_delay = value
+end)
+
+-- Bắt sự kiện khi bật Toggle Auto Plant
+AutoPlantToggle:OnChanged(function(state)
+    auto_plant = state
+
+    if auto_plant then
+        if auto_plant_method == "Choosen Position" and not plant_position then
+            Fluent:Notify({
+                Title = "Error",
+                Content = "No Position Found To Plant",
+                Duration = 3
+            })
+            AutoPlantToggle:Set(false)
+            return
+        end
+
+        auto_plant_thread = task.spawn(function()
+            while auto_plant do
+                if local_player.Character then
+                    local tool = local_player.Character:FindFirstChildOfClass("Tool")
+                    if tool and tool:GetAttribute("ItemType") == "Seed" then
+                        local pos = (auto_plant_method == "Choosen Position" and plant_position)
+                            or local_player.Character:GetPivot().Position
+
+                        replicated_storage.GameEvents.Plant_RE:FireServer(pos, tool:GetAttribute("ItemName"))
+                        task.wait(plant_delay)
+                    end
+                end
+                task.wait()
+            end
+        end)
+    elseif auto_plant_thread then
+        task.cancel(auto_plant_thread)
+        auto_plant_thread = nil
+    end
+end)
+
+
 
 
 
